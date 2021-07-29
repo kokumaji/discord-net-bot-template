@@ -1,16 +1,32 @@
 ﻿using System;
+using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 
 namespace DiscordBot
 {
+    public class Config
+    {
+        public string Key { get; set; }
+        public string Prefix { get; set; }
+
+    }
+
     class Program
     {
-        static void Main(string[] args) => new Program().RunBotAsync().GetAwaiter().GetResult();
+
+        private static Config _config;
+
+        static void Main(string[] args)
+        {
+            _config = LoadConfig();
+            new Program().RunBotAsync().GetAwaiter().GetResult();
+        }
 
         private DiscordSocketClient _client;
         private CommandService _commands;
@@ -26,14 +42,12 @@ namespace DiscordBot
                 .AddSingleton(_commands)
                 .BuildServiceProvider();
 
-            string token = "NTk5NTY2NDA5NjM4MzQ2NzU1.Xi8g1w.IwqzC0mFnTSFT3JQvswhpDzSovU";
-
             _client.Ready += Client_Ready;
             _client.Log += _client_Log;
 
             await RegisterCommandsAsync();
 
-            await _client.LoginAsync(TokenType.Bot, token);
+            await _client.LoginAsync(TokenType.Bot, _config.Key);
 
             await _client.StartAsync();
 
@@ -43,9 +57,19 @@ namespace DiscordBot
 
         }
 
+        private static Config LoadConfig()
+        {
+            string _filePath = Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory);
+            var json = File.ReadAllText(_filePath + "/config.json");
+            var config = JsonConvert.DeserializeObject<Config>(json);
+
+            return config;
+
+        }
+
         private Task Client_Ready()
         {
-            return _client.SetGameAsync("the prefix 'jq!'", null, ActivityType.Listening);
+            return _client.SetGameAsync(String.Format("prefix '{0}'", _config.Prefix), null, ActivityType.Listening);
         }
 
         private Task _client_Log(LogMessage arg)
@@ -69,7 +93,7 @@ namespace DiscordBot
 
             int argPos = 0;
 
-            if(message.HasStringPrefix("jq!", ref argPos))
+            if(message.HasStringPrefix(_config.Prefix, ref argPos))
             {
                 var result = await _commands.ExecuteAsync(context, argPos, _services);
                 if (!result.IsSuccess) Console.WriteLine(result.ErrorReason);
